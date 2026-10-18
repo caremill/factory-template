@@ -55,6 +55,8 @@ jobs:
         run: npm run typecheck
       - name: Unit tests with coverage thresholds
         run: npm run test:coverage
+      - name: Every source file is in the coverage report
+        run: python3 .github/scripts/check_coverage_complete.py
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
