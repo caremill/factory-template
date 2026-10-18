@@ -4,13 +4,27 @@ updates:
     directory: /
     target-branch: stage
     schedule:
-      interval: weekly
+      interval: monthly
     open-pull-requests-limit: 5
+    ignore:
+      # Toolchain majors must move deliberately (see step 4), never through a group.
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'typescript-eslint'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'eslint'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@eslint/js'
+        update-types: ['version-update:semver-major']
     groups:
+      # Vitest and its coverage plugin must share a major version, so they move together.
+      vitest:
+        patterns: ['vitest', '@vitest/*']
       dev-dependencies:
         dependency-type: development
+        update-types: ['minor', 'patch']
   - package-ecosystem: github-actions
     directory: /
     target-branch: stage
     schedule:
-      interval: weekly
+      interval: monthly
