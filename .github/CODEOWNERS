@@ -1,0 +1,31 @@
+# Paths listed here are HIGH RISK: changes need the product owner's review.
+# Everything else can auto-merge into `stage` once all required checks pass.
+# Replace @Marcos-Correia with your GitHub username (bootstrap.py does this for you).
+
+# Pipeline, protection and quality thresholds
+/.github/                     @Marcos-Correia
+/vitest.config.ts             @Marcos-Correia
+/eslint.config.js             @Marcos-Correia
+/tsconfig.json                @Marcos-Correia
+
+# Gated documents (G1 spec sign-off, G2 architecture approval)
+/docs/spec/                   @Marcos-Correia
+/docs/adr/                    @Marcos-Correia
+/docs/contracts/              @Marcos-Correia
+/AGENTS.md                    @Marcos-Correia
+
+# Independent verification
+/tests/acceptance/            @Marcos-Correia
+
+# New dependencies
+/package.json                 @Marcos-Correia
+/package-lock.json            @Marcos-Correia
+
+# Infrastructure
+/infra/                       @Marcos-Correia
+
+# Sensitive domain modules
+/src/**/consent/              @Marcos-Correia
+/src/**/auth/                 @Marcos-Correia
+/src/**/safeguarding/         @Marcos-Correia
+/src/**/payments/             @Marcos-Correia

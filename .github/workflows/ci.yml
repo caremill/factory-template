@@ -1,0 +1,121 @@
+# Deterministic quality gates. Job names are the required status checks configured by Terraform:
+# keep them in sync with terraform/github/variables.tf (required_checks).
+name: ci
+
+on:
+  pull_request:
+    branches: [stage, main]
+  push:
+    branches: [stage, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COVERAGE_MIN_CHANGED_LINES: '80'
+  GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.21.2
+
+jobs:
+  pr-conventions:
+    name: pr-conventions
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check PR links requirement and issue
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: python .github/scripts/check_pr_body.py
+
+  lint-typecheck-test:
+    name: lint-typecheck-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Format
+        run: npm run format:check
+      - name: Lint
+        run: npm run lint
+      - name: Type check
+        run: npm run typecheck
+      - name: Unit tests with coverage thresholds
+        run: npm run test:coverage
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
+
+  diff-coverage:
+    name: diff-coverage
+    if: github.event_name == 'pull_request'
+    needs: lint-typecheck-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install diff-cover
+        run: pip install 'diff-cover>=9,<10'
+      - name: Coverage on changed lines
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          diff-cover coverage/cobertura-coverage.xml \
+            --compare-branch="origin/${{ github.base_ref }}" \
+            --fail-under="${COVERAGE_MIN_CHANGED_LINES}" \
+            --markdown-report diff-coverage.md
+          cat diff-coverage.md >> "$GITHUB_STEP_SUMMARY"
+
+  secret-scan:
+    name: secret-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan commits for secrets (gitleaks)
+        env:
+          LOG_OPTS: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || '' }}
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/repo" -e LOG_OPTS --entrypoint sh "$GITLEAKS_IMAGE" -c '
+            git config --global --add safe.directory /repo
+            if [ -n "$LOG_OPTS" ]; then
+              gitleaks git /repo --redact --verbose --log-opts="$LOG_OPTS"
+            else
+              gitleaks git /repo --redact --verbose
+            fi'
+
+  dependency-review:
+    name: dependency-review
+    # Free for public repositories; private repositories need GitHub Code Security.
+    if: github.event_name == 'pull_request' && !github.event.repository.private
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high

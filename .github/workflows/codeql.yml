@@ -1,0 +1,33 @@
+# Static security analysis. Free for public repositories; private repositories need
+# GitHub Code Security, otherwise this job is skipped.
+# The job name "codeql" is a required status check (no matrix, so the name stays stable).
+name: codeql
+
+on:
+  pull_request:
+    branches: [stage, main]
+  push:
+    branches: [stage, main]
+  schedule:
+    - cron: '17 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  codeql:
+    name: codeql
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          build-mode: none
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:javascript-typescript
